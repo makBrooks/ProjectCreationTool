@@ -1,0 +1,287 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Project</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* Custom CSS */
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }     
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .form-group input::placeholder {
+            color: #999;
+        }
+
+        #submitBtn:hover {
+            background: linear-gradient(to right, #45a049, #2E8B57);
+        }
+
+        .form-group input:focus + label,
+        .form-group input:not(:placeholder-shown) + label {
+            color: #007bff;
+        }
+
+        #downloadBtn:hover {
+            background: linear-gradient(to right, #ff9100, #ff3d00);
+        }
+       
+
+        .content {
+            flex: 1;
+        }
+
+        .form-container {
+            margin-bottom: 20px;
+        }
+
+        fieldset.form-container {
+            border: 2px solid #007bff;
+            border-radius: 5px;
+            padding: 20px 20px 10px 20px;
+            position: relative;
+        }
+
+        legend {
+            font-weight: bold;
+            font-size: 1.2rem;
+            width: auto;
+            padding: 0 10px;
+            color: #007bff;
+            position: absolute;
+            top: -15px;
+            left: 20px;
+            background: #fff;
+        }
+        .form-group label {
+            font-weight: bold;
+        }
+        hr {
+            border: none;
+            height: 2px;
+            background: linear-gradient(90deg, rgba(0, 123, 255, 0) 0%, rgba(0, 123, 255, 0.7) 50%, rgba(0, 123, 255, 0) 100%);
+            margin: 20px 0;
+        }
+        /* Custom styles for h2 */
+        .card-title {
+            font-size: 2rem;
+            color: #007bff;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+        /* Custom styles for card shadow */
+        .custom-card {
+            box-shadow: 0 0 20px #007bff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="content">
+        <div class="container mb-5">
+            <div class="row justify-content-center">
+                <div class="col-md-10">
+                    <div class="card custom-card">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h2 class="card-title text-center mb-4">Create New Project</h2>
+                                    <hr class="hr-custom" />
+                                    <div class="form-container">
+                                        <div class="form-group">
+                                            <label for="ProjectName" class="control-label">Project Name</label>
+                                            <input type="text" id="ProjectName" name="ProjectName" class="form-control" />
+                                            <span id="ProjectNameValidation" class="text-danger"></span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="ModelNames" class="control-label">Model Names</label>
+                                            <input type="text" id="ModelNames" name="ModelNames" class="form-control" />
+                                            <span id="ModelNamesValidation" class="text-danger"></span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="excelFile" class="control-label">Upload Excel Files to Add Properties</label>
+                                            <input type="file" id="excelFile" name="excelFile" class="form-control" accept=".xls, .xlsx" />
+                                            <span id="ExcelFileValidation" class="text-danger"></span>
+                                        </div>
+                                        <div class="form-group">
+                                            <a href="~/Document/ModelProperty.xlsx" id="downloadBtn" download="ModelPropertyTemplete.xlsx" class="btn btn-secondary">
+                                                Download Sample Excel Template
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <fieldset class="form-container">
+                                        <legend>Configuration</legend>
+                                        <div class="form-group">
+                                            <label for="ServerName" class="control-label">Server Name</label>
+                                            <input type="text" id="ServerName" name="ServerName" class="form-control" />
+                                            <span id="ServernameValidation" class="text-danger"></span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="DatabaseName" class="control-label">Database Name</label>
+                                            <input type="text" id="DatabaseName" name="DatabaseName" class="form-control" />
+                                            <span id="DatabasenameValidation" class="text-danger"></span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="Id" class="control-label">ID</label>
+                                            <input type="text" id="Id" name="Id" class="form-control" />
+                                            <span id="uidValidation" class="text-danger"></span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="Password" class="control-label">Password</label>
+                                            <input type="password" id="Password" name="Password" class="form-control" />
+                                            <span id="passwordValidation" class="text-danger"></span>
+                                        </div>
+                                    </fieldset>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <input type="button" id="submitBtn" value="Create Project" class="btn btn-primary" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('#submitBtn').click(function () {
+                showLoader();
+                // Clear previous validation messages
+                $('#ProjectNameValidation').text('');
+                $('#ModelNamesValidation').text('');
+                $('#ExcelFileValidation').text('');
+                $('#ServernameValidation').text('');
+                $('#DatabasenameValidation').text('');
+                $('#uidValidation').text('');
+                $('#passwordValidation').text('');
+
+                // Get form values
+                var projectName = $('#ProjectName').val().trim();
+                var modelNames = $('#ModelNames').val().trim().split(',');
+                var fileInput = $('#excelFile')[0].files[0];
+                var serverName = $('#ServerName').val().trim();
+                var dbName = $('#DatabaseName').val().trim();
+                var id = $('#Id').val().trim();
+                var pass = $('#Password').val().trim();
+
+                // Basic validation
+                var isValid = true;
+                const projectNamePattern = /^[A-Za-z_]+$/;
+
+                if (projectName === '') {
+                    $('#ProjectNameValidation').text('Project Name is required.');
+                    isValid = false;
+                } else if (!projectNamePattern.test(projectName)) {
+                    $('#ProjectNameValidation').text('Project Name can only contain alphabets and underscores.');
+                    isValid = false;
+                } else {
+                    $('#ProjectNameValidation').text('');  // Clear the validation message if the input is valid
+                    isValid = true;
+                }
+                if (modelNames.length === 0 || (modelNames.length === 1 && modelNames[0] === '')) {
+                    $('#ModelNamesValidation').text('At least one Model Name is required.');
+                    isValid = false;
+                }
+                if (!fileInput) {
+                    $('#ExcelFileValidation').text('Please select a file.');
+                    isValid = false;
+                } else if (!isValidFileType(fileInput)) {
+                    $('#ExcelFileValidation').text('Please select a valid Excel file (XLS or XLSX).');
+                    isValid = false;
+                }
+                if (serverName === '') {
+                    $('#ServernameValidation').text('Server Name is required.');
+                    isValid = false;
+                }
+                if (dbName === '') {
+                    $('#DatabasenameValidation').text('Database Name is required.');
+                    isValid = false;
+                }
+                if (id === '') {
+                    $('#uidValidation').text('User Id is required.');
+                    isValid = false;
+                }
+                if (pass === '') {
+                    $('#passwordValidation').text('Password is required.');
+                    isValid = false;
+                }
+                if (isValid) {
+                    // Create FormData object
+                    var formData = new FormData();
+                    formData.append('ProjectName', projectName);
+                    formData.append('ExcelFile', fileInput);
+                    formData.append('ServerName', serverName);
+                    formData.append('DatabaseName', dbName);
+                    formData.append('ID', id);
+                    formData.append('Password', pass);
+                    modelNames.forEach(function (modelName, index) {
+                        formData.append('ModelNames[' + index + ']', modelName);
+                    });
+                    // Send AJAX request
+                    $.ajax({
+                        type: 'POST',
+                        url: '/Home/GenerateProject',  // Replace with your actual endpoint
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function (response) {
+                            hideLoader();
+                            alert(response.message); // Show success message
+                            $('#ProjectName').val('');
+                            $('#ModelNames').val('');
+                            $('#excelFile').val('');
+                            $('#ServerName').val('');
+                            $('#DatabaseName').val('');
+                            $('#Id').val('');
+                            $('#Password').val('');
+                        },
+                        error: function (xhr, status, error) {
+                            alert('Error: ' + xhr.responseText); // Show error message
+                        }
+                    });
+                }
+                else {
+                    hideLoader();
+                }
+            });
+
+            // Function to validate file type
+            function isValidFileType(file) {
+                var allowedTypes = ['xls', 'xlsx'];
+                var fileType = file.name.split('.').pop().toLowerCase();
+                return allowedTypes.indexOf(fileType) !== -1;
+            }
+
+        });
+    </script>
+    
+
+</body>
+</html>
