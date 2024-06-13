@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using OfficeOpenXml;
 using ProjectCreator.Models;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.Design;
 using System.Data.SqlClient;
 using System.Diagnostics;
@@ -257,7 +258,7 @@ namespace ProjectCreator.Controllers
                         var propertyName = worksheet.Cells[row, 2].Text.Trim();
                         var dataType = worksheet.Cells[row, 3].Text.Trim();
                         var primaryKey = worksheet.Cells[row, 4].Text.Trim();
-                        if (primaryKey.ToLower()=="primary key" || primaryKey.ToLower() == "primarykey" || primaryKey.ToLower() == "primary")
+                        if (primaryKey.ToLower() == "primary key" || primaryKey.ToLower() == "primarykey" || primaryKey.ToLower() == "primary")
                         {
                             IsPrimaryKey = true;
                         }
@@ -304,7 +305,7 @@ namespace ProjectCreator.Controllers
                 {
                     classCode += "        [Key]\n";
                 }
-                if (dataType=="int")
+                if (dataType == "int")
                 {
                     classCode += $"        public {dataType} {propertyName} {{ get; set; }} = 0;\n";
                 }
@@ -312,15 +313,15 @@ namespace ProjectCreator.Controllers
                 {
                     classCode += $"        public {dataType} {propertyName} {{ get; set; }} = null;\n";
                 }
-                
+
             }
 
             classCode += "    }\n}";
             return classCode;
         }
 
-    // Method to execute command
-    private void ExecuteDotnetCommand(string command)
+        // Method to execute command
+        private void ExecuteDotnetCommand(string command)
         {
             try
             {
@@ -407,7 +408,7 @@ namespace {projectName}.Models
                 throw ex;
             }
         }
-        
+
         private string GenerateDbContextClass(string projectName, string[] modelNames)
         {
             try
@@ -469,7 +470,7 @@ namespace {projectName}.Models
 
                     // Set the DefaultConnection property
                     appsettings["ConnectionStrings"]["DefaultConnection"] = $"Data Source={input.ServerName};Initial Catalog={input.DatabaseName};User Id={input.ID};Password={input.Password};TrustServerCertificate=True; Integrated Security=False;Persist Security Info=False;";
-                    var connectionString= $"Data Source={input.ServerName};Initial Catalog={input.DatabaseName};User Id={input.ID};Password={input.Password};TrustServerCertificate=True; Integrated Security=False;Persist Security Info=False;";
+                    var connectionString = $"Data Source={input.ServerName};Initial Catalog={input.DatabaseName};User Id={input.ID};Password={input.Password};TrustServerCertificate=True; Integrated Security=False;Persist Security Info=False;";
                     // Write the updated appsettings back to the file
                     await System.IO.File.WriteAllTextAsync(appsettingsPath, JsonConvert.SerializeObject(appsettings, Newtonsoft.Json.Formatting.Indented));
                     ConfigureDbContext(projectDirectory, input);
@@ -483,7 +484,7 @@ namespace {projectName}.Models
                     await System.IO.File.WriteAllTextAsync(appsettingsPath, updatedAppsettingsJson);
                 }
 
-                
+
             }
             catch (Exception ex)
             {
@@ -543,7 +544,7 @@ namespace {projectName}.Models
             }
         }
         //Method to generate Interface content
-        private string GenerateInterfaceContent(CreatorEntity input,string modelName)
+        private string GenerateInterfaceContent(CreatorEntity input, string modelName)
         {
             try
             {
@@ -570,7 +571,7 @@ namespace {input.ProjectName}.Repositories
             }
         }
         //generate repository content
-        private string GenerateRepositoryContent(CreatorEntity input,string modelName)
+        private string GenerateRepositoryContent(CreatorEntity input, string modelName)
         {
             try
             {
@@ -752,7 +753,7 @@ namespace {namespaceName}.Controllers
         }}
 
         // GET: {modelName}
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Details()
         {{
             try
             {{
@@ -766,7 +767,7 @@ namespace {namespaceName}.Controllers
         }}
 
         // GET: {modelName}/Details/5
-        public async Task<IActionResult> {modelName}Details(int? id)
+        public async Task<IActionResult> GetbyId(int? id)
         {{
             if (id == null)
             {{
@@ -790,7 +791,7 @@ namespace {namespaceName}.Controllers
         }}
 
         // GET: {modelName}/Create
-        public IActionResult {modelName}Create()
+        public IActionResult Create()
         {{
             return View();
         }}
@@ -798,14 +799,14 @@ namespace {namespaceName}.Controllers
         // POST: {modelName}/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> {modelName}Create({modelName} model)
+        public async Task<IActionResult> Create({modelName} model)
         {{
             if (ModelState.IsValid)
             {{
                 try
                 {{
                     await _{modelName.ToLower()}Repository.AddAsync(model);
-                    return RedirectToAction(nameof(Index));
+                    return RedirectToAction(nameof(Details));
                 }}
                 catch (Exception ex)
                 {{
@@ -816,7 +817,7 @@ namespace {namespaceName}.Controllers
         }}
 
         // GET: {modelName}/Edit/5
-        public async Task<IActionResult> {modelName}Edit(int? id)
+        public async Task<IActionResult> Edit(int? id)
         {{
             if (id == null)
             {{
@@ -841,14 +842,14 @@ namespace {namespaceName}.Controllers
         // POST: {modelName}/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> {modelName}Edit({modelName} model)
+        public async Task<IActionResult> Edit({modelName} model)
         {{
             if (ModelState.IsValid)
             {{
                 try
                 {{
                     await _{modelName.ToLower()}Repository.UpdateAsync(model);
-                    return RedirectToAction(nameof(Index));
+                    return RedirectToAction(nameof(Details));
                 }}                
                 catch (Exception ex)
                 {{
@@ -858,48 +859,32 @@ namespace {namespaceName}.Controllers
             return View(model);
         }}
 
-        // GET: {modelName}/Delete/5
-        public async Task<IActionResult> {modelName}Delete(int? id)
+        // POST: {{modelName}}/Delete/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
         {{
-            if (id == null)
-            {{
-                return NotFound();
-            }}
-
             try
             {{
-                var model = await _{modelName.ToLower()}Repository.GetByIdAsync(id.Value);
+                var model = await _{modelName.ToLower()}Repository.GetByIdAsync(id);
                 if (model == null)
                 {{
                     return NotFound();
                 }}
-                return View(model);
+ 
+                await _{modelName.ToLower()}Repository.DeleteAsync(id);
+                return RedirectToAction(nameof(Details));
             }}
             catch (Exception ex)
             {{
+                // Log the exception details (optional)
                 return StatusCode(500, $""Internal server error: {{ex.Message}}"");
             }}
         }}
+            }}
+        }}
+        ";
 
-        // POST: {modelName}/Delete/5
-        [HttpPost, ActionName(""Delete"")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {{
-            try
-            {{
-                await _{modelName.ToLower()}Repository.DeleteAsync(id);
-                return RedirectToAction(nameof(Index));
-            }}
-            catch (Exception ex)
-            {{
-                return StatusCode(500, $""Internal server error: {{ ex.Message}}"");
-            }}
-        }}        
-    }}
-}}
-";
-            
         }
 
 
@@ -914,14 +899,17 @@ namespace {namespaceName}.Controllers
                 Directory.CreateDirectory(controllerFolder);
 
                 // Generate combined views
-                string addEditViewContent = GenerateAddEditViewTemplate(namespaceName, modelName, properties);
+                string addEditViewContent = GenerateAddViewTemplate(namespaceName, modelName, headers);
                 string viewDeleteViewContent = GenerateViewDeleteViewTemplate(namespaceName, modelName, properties);
+                string viewEditViewFileContent = GenerateEditViewTemplate(namespaceName, modelName, properties);
 
-                string addEditViewFilePath = Path.Combine(controllerFolder,  modelName + "Create.cshtml");
-                string viewDeleteViewFilePath = Path.Combine(controllerFolder, modelName + "Details.cshtml");
+                string addEditViewFilePath = Path.Combine(controllerFolder, "Create.cshtml");
+                string viewDeleteViewFilePath = Path.Combine(controllerFolder, "Details.cshtml");
+                string viewEditViewFilePath = Path.Combine(controllerFolder, "Edit.cshtml");
 
                 await System.IO.File.WriteAllTextAsync(addEditViewFilePath, addEditViewContent);
                 await System.IO.File.WriteAllTextAsync(viewDeleteViewFilePath, viewDeleteViewContent);
+                await System.IO.File.WriteAllTextAsync(viewEditViewFilePath, viewEditViewFileContent);
             }
             catch (Exception ex)
             {
@@ -929,20 +917,203 @@ namespace {namespaceName}.Controllers
             }
         }
 
-        private string GenerateAddEditViewTemplate(string namespaceName, string modelName, List<string> properties)
+        
+        private string GenerateNavBar(string activeTab, string modelName)
         {
-            string formFields = string.Join("\n", properties.Select(p => $@"
+            string addTabClass = activeTab == "Add" ? "active" : "";
+            string viewTabClass = activeTab == "View" ? "active" : "";
+
+            return $@"
+            <style>
+            .nav-link.active {{
+                color: #dc3545 !important; /* Red color for active link */
+                border-bottom: 2px solid #dc3545; /* Red underline for active link */
+            }}
+            </style>
+            <div class=""container"">
+            <nav class=""nav nav-tabs"">
+                <a class=""nav-item nav-link {addTabClass}"" href=""/{modelName}/Create"">ADD</a>
+                <a class=""nav-item nav-link {viewTabClass}"" href=""/{modelName}/Details"">View</a>
+            </nav>
+            </div>
+            ";
+        }
+        private string GenerateAddViewTemplate(string namespaceName, string modelName, List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey)> headers)
+        {
+            // Filter headers to exclude primary key properties
+            var properties = headers
+    .Where(h => !h.IsPrimaryKey && h.ModelName == modelName)
+    .Select(h => h.PropertyName)
+    .ToList();
+
+            // Split properties into groups of 3
+            var groupedProperties = properties.Select((p, i) => new { Property = p, Index = i })
+                                               .GroupBy(x => x.Index / 3)
+                                               .Select(g => g.Select(x => x.Property).ToList())
+                                               .ToList();
+
+            // Generate form fields
+            string formFields = string.Join("\n", groupedProperties.Select(group =>
+            {
+                string fields = string.Join("\n", group.Select(p => $@"
+<div class=""col-md-4"">
 <div class=""form-group"">
-    <label asp-for=""{p}"" class=""control-label""></label>
-    <input asp-for=""{p}"" class=""form-control"" />
-    <span asp-validation-for=""{p}"" class=""text-danger""></span>
+<label asp-for=""{p}"" class=""control-label""></label>
+<input asp-for=""{p}"" class=""form-control"" />
+<span asp-validation-for=""{p}"" class=""text-danger""></span>
+</div>
 </div>"));
+                return $@"<div class=""row"">
+    {fields}
+</div>";
+            }));
+
+            return $@"
+@model {namespaceName}.Models.{modelName}
+ 
+@{{
+    ViewData[""Title""] = ""Add {modelName}"";
+}}
+ 
+<h1>@ViewData[""Title""]</h1>
+{GenerateNavBar("Add", modelName)} <!-- Include the navigation bar here with 'Add' tab as active -->
+<div class=""container mt-5""> <!-- Added mt-5 for margin top -->
+<div class=""tab-content"" id=""nav-tabContent"">
+<div class=""tab-pane fade show active"" id=""nav-add"" role=""tabpanel"" aria-labelledby=""nav-add-tab"">
+<div class=""card"">
+<div class=""card-body"">
+<form asp-action=""Create"">
+<div asp-validation-summary=""ModelOnly"" class=""text-danger""></div>
+                        {formFields}
+<div class=""form-group text-center mt-5"">
+<input type=""submit"" value=""Add"" class=""btn btn-primary"" />
+<input type=""reset"" value=""Reset"" class=""btn btn-secondary ml-2"" />
+</div>
+</form>
+</div>
+</div>
+</div>
+</div>
+</div>
+ 
+<!-- Bootstrap JS and dependencies -->
+<script src=""https://code.jquery.com/jquery-3.5.1.slim.min.js""></script>
+<script src=""https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js""></script>
+";
+        }
+        private string GenerateViewDeleteViewTemplate(string namespaceName, string modelName, List<string> properties)
+        {
+            // Find the first string that contains "id"
+            string firstPropertyWithId = properties.FirstOrDefault(property => property.Contains("id", StringComparison.OrdinalIgnoreCase));
+
+            // Generating table headers
+            string tableHeaders = string.Join("\n", properties.Select(p => $@"
+        <th>@Html.DisplayNameFor(model => model.{p})</th>"));
+
+            // Generating table rows
+            string tableRows = string.Join("\n", properties.Select(p => $@"
+        <td>@Html.DisplayFor(modelItem => item.{p})</td>"));
+
+            return $@"
+@model IEnumerable<{namespaceName}.Models.{modelName}>
+
+@{{
+    ViewData[""Title""] = ""View {modelName}"";
+}}
+<link href=""https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"" rel=""stylesheet"" />
+<link href=""https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"" rel=""stylesheet"" />
+<h1>@ViewData[""Title""]</h1>
+{GenerateNavBar("View", modelName)} <!-- Include the navigation bar here with 'Add' tab as active -->
+<table class=""table table-bordered"">
+    <thead>
+        <tr>
+            {tableHeaders}
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {{
+            <tr>
+                {tableRows}
+                <td>
+                    @using (Html.BeginForm(""Delete"", ""{modelName}"", new {{ id = item.{firstPropertyWithId} }}, FormMethod.Post))
+                    {{
+                        @Html.AntiForgeryToken();
+                    <a class=""btn btn-info"" asp-action=""Edit"" asp-route-id=""@item.{firstPropertyWithId}""><i class=""fas fa-edit""></i></a>
+                        <button type=""submit"" class=""btn btn-danger"">
+                            <i class=""fas fa-trash-alt""></i>
+                        </button>
+                    }}
+                </td>
+            </tr>
+        }}
+    </tbody>
+</table>
+<!-- Bootstrap JS and dependencies -->
+<script src=""https://code.jquery.com/jquery-3.5.1.slim.min.js""></script>
+<script src=""https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js""></script>
+<script src=""https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.jss""></script>
+";
+        }
+
+
+
+        private string GenerateEditViewTemplate(string namespaceName, string modelName, List<string> prop)
+        {
+            var primaryKeyField = headers
+                .Where(h => h.IsPrimaryKey && h.ModelName == modelName)
+                .Select(h => h.PropertyName)
+                .FirstOrDefault();
+
+            var properties = headers
+                .Where(h => !h.IsPrimaryKey && h.ModelName == modelName)
+                .Select(h => h.PropertyName)
+                .ToList();
+
+            // Split properties into groups of 3
+            var groupedProperties = properties
+                .Select((p, i) => new { Property = p, Index = i })
+                .GroupBy(x => x.Index / 3)
+                .Select(g => g.Select(x => x.Property).ToList())
+                .ToList();
+
+            string formFields = "";
+
+            // Include primary key field at the top if it exists
+            if (!string.IsNullOrEmpty(primaryKeyField))
+            {
+                formFields += $@"
+<div class=""col-md-4"">
+    <div class=""form-group"">
+        <label asp-for=""{primaryKeyField}"" class=""control-label""></label>
+        <input asp-for=""{primaryKeyField}"" class=""form-control"" readonly />
+        <span asp-validation-for=""{primaryKeyField}"" class=""text-danger""></span>
+    </div>
+</div>";
+            }
+
+            // Generate form fields for the rest of the properties
+            formFields += string.Join("\n", groupedProperties.Select(group =>
+            {
+                string fields = string.Join("\n", group.Select(p => $@"
+<div class=""col-md-4"">
+    <div class=""form-group"">
+        <label asp-for=""{p}"" class=""control-label""></label>
+        <input asp-for=""{p}"" class=""form-control"" />
+        <span asp-validation-for=""{p}"" class=""text-danger""></span>
+    </div>
+</div>"));
+                return $@"<div class=""row"">
+    {fields}
+</div>";
+            }));
 
             return $@"
 @model {namespaceName}.Models.{modelName}
 
 @{{
-    ViewData[""Title""] = ""Add {modelName}"";
+    ViewData[""Title""] = ""Edit {modelName}"";
 }}
 
 <h1>@ViewData[""Title""]</h1>
@@ -950,66 +1121,22 @@ namespace {namespaceName}.Controllers
 <h4>{modelName}</h4>
 <hr />
 <div class=""row"">
-    <div class=""col-md-4"">
-        <form asp-action=""{modelName}Create"">
+    <div class=""col-md-12"">
+        <form asp-action=""Edit"">
             <div asp-validation-summary=""ModelOnly"" class=""text-danger""></div>
             {formFields}
-            <div class=""form-group"">
-                <input type=""submit"" value=""{modelName}Create"" class=""btn btn-primary"" />
+            <div class=""form-group text-center mt-5"">
+                <input type=""submit"" value=""Update"" class=""btn btn-primary"" />
+                <a class=""btn btn-danger"" asp-controller=""{modelName}"" asp-action=""Details"">Cancel</a>
             </div>
         </form>
     </div>
 </div>
 
-<div>
-    <a asp-action=""Index"">Back to List</a>
-</div>
-";
+@section Scripts {{
+    @{{await Html.RenderPartialAsync(""_ValidationScriptsPartial"");}}
+}}";
         }
-
-        private string GenerateViewDeleteViewTemplate(string namespaceName, string modelName, List<string> properties)
-        {
-            // Find the first string that contains "id"
-            string firstPropertyWithId = properties.FirstOrDefault(property => property.Contains("id"));
-            string detailFields = string.Join("\n", properties.Select(p => $@"
-<dt class=""col-sm-2"">
-    @Html.DisplayNameFor(model => model.{p})
-</dt>
-<dd class=""col-sm-10"">
-    @Html.DisplayFor(model => model.{p})
-</dd>"));
-
-            return $@"
-@model {namespaceName}.Models.{modelName}
-
-@{{
-    ViewData[""Title""] = ""View {modelName}"";
-}}
-
-<h1>@ViewData[""Title""]</h1>
-
-<div>
-    <h4>{modelName}</h4>
-    <hr />
-    <dl class=""row"">
-        {detailFields}
-    </dl>
-</div>
-<div>
-    <a asp-action=""{modelName}Edit"" asp-route-id=""@Model.{firstPropertyWithId}"">Edit</a> |
-    <a asp-action=""Index"">Back to List</a>
-</div>
-
-<form asp-action=""{modelName}Delete"">
-    <input type=""hidden"" asp-for=""@Model.{firstPropertyWithId}"" />
-    <input type=""submit"" value=""Delete"" class=""btn btn-danger"" />
-</form>
-";
-        }
-
-
-
-
 
 
 
