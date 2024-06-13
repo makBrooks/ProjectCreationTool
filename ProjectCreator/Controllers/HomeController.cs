@@ -10,12 +10,15 @@ using ProjectCreator.Models;
 using System.ComponentModel.Design;
 using System.Data.SqlClient;
 using System.Diagnostics;
+using System.Net.Sockets;
+using System.Net;
 using System.Reflection;
 using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using Microsoft.Web.Administration;
 
 namespace ProjectCreator.Controllers
 {
@@ -43,7 +46,7 @@ namespace ProjectCreator.Controllers
             }
 
             string projectDirectory = Path.Combine("D:\\", input.ProjectName);
-
+              string publishDir = Path.Combine(projectDirectory, $"publish_{input.ProjectName}");
             if (Directory.Exists(projectDirectory))
             {
                 try
@@ -131,17 +134,107 @@ namespace ProjectCreator.Controllers
                 await RunMigrationCommandAndOpenSolution(projectDirectory, "InitialMigration", solutionPath);
 
 
-                // Run migration script in Package Manager Console
-                //await RunMigrationScript(scriptPath);
+                // Publish the project
+                ExecuteDotnetCommand($"dotnet publish \"{Path.Combine(projectDirectory, $"{input.ProjectName}.csproj")}\" -c Release -o \"{publishDir}\"");
+
+                // Set up IIS
+                string siteName = input.ProjectName;
+                string appPoolName = $"{input.ProjectName}AppPool";
+                string ipAddress = GetLocalIPAddress();  // Get the local IP address
+                int port = 80;
 
 
-                //// Open the solution in Visual Studio
-                //OpenSolutionInVisualStudio(solutionPath);
-                return Ok(new { message = "Project created successfully" });
+                CreateIISApplication(siteName, appPoolName, publishDir, ipAddress, port);
+
+                string url = $"http://{ipAddress}";
+
+                return Ok(new { message = "Project created and published successfully", url = url });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, $"Failed to create project: {ex.Message}");
+            }
+        }
+        public static string GetLocalIPAddress()
+        {
+            var host = Dns.GetHostEntry(Dns.GetHostName());
+            foreach (var ip in host.AddressList)
+            {
+                if (ip.AddressFamily == AddressFamily.InterNetwork)
+                {
+                    return ip.ToString();
+                }
+            }
+            throw new Exception("Local IP Address Not Found!");
+        }
+
+        private void CopyDirectory(string sourceDir, string destDir)
+        {
+            var dir = new DirectoryInfo(sourceDir);
+            if (!dir.Exists)
+            {
+                throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
+            }
+
+            DirectoryInfo[] dirs = dir.GetDirectories();
+            if (!Directory.Exists(destDir))
+            {
+                Directory.CreateDirectory(destDir);
+            }
+
+            foreach (FileInfo file in dir.GetFiles())
+            {
+                string tempPath = Path.Combine(destDir, file.Name);
+                file.CopyTo(tempPath, false);
+            }
+
+            foreach (DirectoryInfo subdir in dirs)
+            {
+                string tempPath = Path.Combine(destDir, subdir.Name);
+                CopyDirectory(subdir.FullName, tempPath);
+            }
+        }
+
+        public void CreateIISApplication(string siteName, string appPoolName, string physicalPath, string ipAddress, int port = 80)
+        {
+            try
+            {
+                using (var serverManager = new Microsoft.Web.Administration.ServerManager())
+                {
+                    // Create the application pool if it doesn't exist
+                    if (serverManager.ApplicationPools[appPoolName] == null)
+                    {
+                        var appPool = serverManager.ApplicationPools.Add(appPoolName);
+                        appPool.ManagedRuntimeVersion = ""; // No managed runtime version for .NET Core/.NET 5+
+                        appPool.ManagedPipelineMode = ManagedPipelineMode.Integrated;
+                    }
+
+                    // Create or update the site
+                    var site = serverManager.Sites[siteName];
+                    if (site == null)
+                    {
+                        site = serverManager.Sites.Add(siteName, "http", $"{ipAddress}:{port}:", physicalPath);
+                        site.ApplicationDefaults.ApplicationPoolName = appPoolName;
+                    }
+                    else
+                    {
+                        // If the site exists, update the physical path and bindings
+                        site.Applications["/"].VirtualDirectories["/"].PhysicalPath = physicalPath;
+                        site.ApplicationDefaults.ApplicationPoolName = appPoolName;
+                        site.Bindings.Clear();
+                        site.Bindings.Add($"{ipAddress}:{port}:", "http");
+                    }
+
+                    serverManager.CommitChanges();
+                }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new Exception($"Failed to create IIS application. Ensure the application is running with administrative privileges. Details: {ex.Message}", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"An error occurred while creating the IIS application: {ex.Message}", ex);
             }
         }
 
