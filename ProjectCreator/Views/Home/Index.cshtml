@@ -264,6 +264,7 @@
                         },
                         error: function (xhr, status, error) {
                             alert('Error: ' + xhr.responseText); // Show error message
+                            hideLoader();
                         }
                     });
                 }

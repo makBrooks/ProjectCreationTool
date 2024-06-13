@@ -62,6 +62,16 @@ namespace ProjectCreator.Controllers
                 string dbcontext = Path.Combine(projectDirectory, "DBContexts");
                 Directory.CreateDirectory(dbcontext);
                 string solutionPath = Path.Combine(projectDirectory, $"{input.ProjectName}.sln");
+                bool isDotnetEfInstalled = await IsDotnetEfInstalledAsync();
+
+                if (isDotnetEfInstalled)
+                {
+                    ExecuteDotnetCommand("dotnet tool update --global dotnet-ef");
+                }
+                else
+                {
+                    ExecuteDotnetCommand("dotnet tool install --global dotnet-ef");
+                }
                 ExecuteDotnetCommand($"new sln -n {input.ProjectName} -o \"{projectDirectory}\"");
 
                 ExecuteDotnetCommand($"new mvc -o \"{projectDirectory}\"");
@@ -117,7 +127,7 @@ namespace ProjectCreator.Controllers
                     await GenerateViews(projectDirectory, input.ProjectName, modelName, propertyNames);
                 }
 
-                // Call this method after generating the project
+                // method after generating the project to create database
                 await RunMigrationCommandAndOpenSolution(projectDirectory, "InitialMigration", solutionPath);
 
 
@@ -135,7 +145,38 @@ namespace ProjectCreator.Controllers
             }
         }
 
+        private async Task<bool> IsDotnetEfInstalledAsync()
+        {
+            string result = await ExecuteDotnetCommandAsync("dotnet tool list --global");
+            return result.Contains("dotnet-ef");
+        }
 
+        private async Task<string> ExecuteDotnetCommandAsync(string command)
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c {command}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                }
+            };
+
+            var output = new StringBuilder();
+            process.OutputDataReceived += (sender, e) => { if (e.Data != null) output.AppendLine(e.Data); };
+            process.ErrorDataReceived += (sender, e) => { if (e.Data != null) output.AppendLine(e.Data); };
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            await process.WaitForExitAsync();
+
+            return output.ToString();
+        }
         private async Task RunMigrationCommandAndOpenSolution(string projectDirectory, string migrationName, string solutionPath)
         {
             try
@@ -180,9 +221,6 @@ namespace ProjectCreator.Controllers
                         }
                     }
                 });
-
-                // Open the solution in Visual Studio
-                Process.Start(solutionPath);
             }
             catch (Exception ex)
             {
@@ -963,8 +1001,8 @@ namespace {namespaceName}.Controllers
 </div>
 
 <form asp-action=""{modelName}Delete"">
-    <input type=""hidden"" asp-for=""{firstPropertyWithId}"" />
-    <input type=""submit"" value=""{modelName}Delete"" class=""btn btn-danger"" />
+    <input type=""hidden"" asp-for=""@Model.{firstPropertyWithId}"" />
+    <input type=""submit"" value=""Delete"" class=""btn btn-danger"" />
 </form>
 ";
         }
