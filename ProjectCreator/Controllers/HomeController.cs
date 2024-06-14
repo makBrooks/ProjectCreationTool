@@ -138,6 +138,10 @@ namespace ProjectCreator.Controllers
                 // Publish the project
                 ExecuteDotnetCommand($"dotnet publish \"{Path.Combine(projectDirectory, $"{input.ProjectName}.csproj")}\" -c Release -o \"{publishDir}\"");
 
+                // Copy published files to desktop
+                string desktopPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), $"publish_{input.ProjectName}");
+                DirectoryCopy(publishDir, desktopPath, true);
+
                 // Set up IIS
                 string siteName = input.ProjectName;
                 string appPoolName = $"{input.ProjectName}AppPool";
@@ -169,30 +173,34 @@ namespace ProjectCreator.Controllers
             throw new Exception("Local IP Address Not Found!");
         }
 
-        private void CopyDirectory(string sourceDir, string destDir)
+        // copy directories
+        private void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs)
         {
-            var dir = new DirectoryInfo(sourceDir);
-            if (!dir.Exists)
-            {
-                throw new DirectoryNotFoundException($"Source directory not found: {sourceDir}");
-            }
-
+            DirectoryInfo dir = new DirectoryInfo(sourceDirName);
             DirectoryInfo[] dirs = dir.GetDirectories();
-            if (!Directory.Exists(destDir))
+
+            // If the destination directory doesn't exist, create it.       
+            if (!Directory.Exists(destDirName))
             {
-                Directory.CreateDirectory(destDir);
+                Directory.CreateDirectory(destDirName);
             }
 
-            foreach (FileInfo file in dir.GetFiles())
+            // Get the file contents of the directory to copy.
+            FileInfo[] files = dir.GetFiles();
+            foreach (FileInfo file in files)
             {
-                string tempPath = Path.Combine(destDir, file.Name);
+                string tempPath = Path.Combine(destDirName, file.Name);
                 file.CopyTo(tempPath, false);
             }
 
-            foreach (DirectoryInfo subdir in dirs)
+            // If copying subdirectories, copy them and their contents to new location.
+            if (copySubDirs)
             {
-                string tempPath = Path.Combine(destDir, subdir.Name);
-                CopyDirectory(subdir.FullName, tempPath);
+                foreach (DirectoryInfo subdir in dirs)
+                {
+                    string tempPath = Path.Combine(destDirName, subdir.Name);
+                    DirectoryCopy(subdir.FullName, tempPath, copySubDirs);
+                }
             }
         }
 
