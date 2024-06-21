@@ -29,6 +29,13 @@ namespace ProjectCreator.Controllers
         {
             _logger = logger;
         }
+        private static Random random = new Random();
+
+        private static int GenerateRandomTwoDigitPortNumber()
+        {
+
+            return random.Next(40, 100);
+        }
 
 
         // Method to generate a project and add properties from an Excel file to model classes
@@ -145,7 +152,7 @@ namespace ProjectCreator.Controllers
                 string siteName = input.ProjectName;
                 string appPoolName = $"{input.ProjectName}AppPool";
                 string ipAddress = GetLocalIPAddress();  // Get the local IP address
-                int port = 80;
+                int port = GenerateRandomTwoDigitPortNumber();
 
 
                 CreateIISApplication(siteName, appPoolName, publishDir, ipAddress, port);
@@ -329,8 +336,6 @@ namespace ProjectCreator.Controllers
                 Console.WriteLine($"Failed to run migration commands and open solution in Visual Studio: {ex.Message}");
             }
         }
-
-
 
 
 
@@ -835,16 +840,17 @@ namespace {input.ProjectName}.Container
 
             foreach (var modelName in modelNames)
             {
-                //var properties = modelProperties.ContainsKey(modelName) ? modelProperties[modelName] : new List<string> { "Id" };
                 string controllerContent = GenerateControllerTemplate(namespaceName, modelName);
                 string controllerFilePath = Path.Combine(controllersPath, $"{modelName}Controller.cs");
                 await System.IO.File.WriteAllTextAsync(controllerFilePath, controllerContent);
             }
         }
 
-
         private string GenerateControllerTemplate(string namespaceName, string modelName)
         {
+            string modelVariable = modelName.ToLower();
+
+            string dropdownMethods = GenerateDropdownMethods(modelName, namespaceName);
 
             return $@"
 using Microsoft.AspNetCore.Mvc;
@@ -855,25 +861,26 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace {namespaceName}.Controllers
 {{
     public class {modelName}Controller : Controller
     {{
-        private readonly I{modelName}Repository _{modelName.ToLower()}Repository;
+        private readonly I{modelName}Repository _{modelVariable}Repository;
 
-        public {modelName}Controller(I{modelName}Repository {modelName.ToLower()}Repository)
+        public {modelName}Controller(I{modelName}Repository {modelVariable}Repository)
         {{
-            _{modelName.ToLower()}Repository = {modelName.ToLower()}Repository;
+            _{modelVariable}Repository = {modelVariable}Repository;
         }}
 
         // GET: {modelName}
-        public async Task<IActionResult> Details()
+        public async Task<IActionResult> Index()
         {{
             try
             {{
-                var {modelName.ToLower()}List = await _{modelName.ToLower()}Repository.GetAllAsync();
-                return View({modelName.ToLower()}List);
+                var {modelVariable}List = await _{modelVariable}Repository.GetAllAsync();
+                return View({modelVariable}List);
             }}
             catch (Exception ex)
             {{
@@ -882,7 +889,7 @@ namespace {namespaceName}.Controllers
         }}
 
         // GET: {modelName}/Details/5
-        public async Task<IActionResult> GetbyId(int? id)
+        public async Task<IActionResult> Details(int? id)
         {{
             if (id == null)
             {{
@@ -891,13 +898,13 @@ namespace {namespaceName}.Controllers
 
             try
             {{
-                var {modelName.ToLower()} = await _{modelName.ToLower()}Repository.GetByIdAsync(id.Value);
-                if ({modelName.ToLower()} == null)
+                var {modelVariable} = await _{modelVariable}Repository.GetByIdAsync(id.Value);
+                if ({modelVariable} == null)
                 {{
                     return NotFound();
                 }}
 
-                return View({modelName.ToLower()});
+                return View({modelVariable});
             }}
             catch (Exception ex)
             {{
@@ -920,8 +927,8 @@ namespace {namespaceName}.Controllers
             {{
                 try
                 {{
-                    await _{modelName.ToLower()}Repository.AddAsync(model);
-                    return RedirectToAction(nameof(Details));
+                    await _{modelVariable}Repository.AddAsync(model);
+                    return RedirectToAction(nameof(Index));
                 }}
                 catch (Exception ex)
                 {{
@@ -941,7 +948,7 @@ namespace {namespaceName}.Controllers
 
             try
             {{
-                var model = await _{modelName.ToLower()}Repository.GetByIdAsync(id.Value);
+                var model = await _{modelVariable}Repository.GetByIdAsync(id.Value);
                 if (model == null)
                 {{
                     return NotFound();
@@ -963,9 +970,9 @@ namespace {namespaceName}.Controllers
             {{
                 try
                 {{
-                    await _{modelName.ToLower()}Repository.UpdateAsync(model);
-                    return RedirectToAction(nameof(Details));
-                }}                
+                    await _{modelVariable}Repository.UpdateAsync(model);
+                    return RedirectToAction(nameof(Index));
+                }}
                 catch (Exception ex)
                 {{
                     return StatusCode(500, $""Internal server error: {{ex.Message}}"");
@@ -974,35 +981,79 @@ namespace {namespaceName}.Controllers
             return View(model);
         }}
 
-        // POST: {{modelName}}/Delete/5
+        // POST: {modelName}/Delete/5
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {{
             try
             {{
-                var model = await _{modelName.ToLower()}Repository.GetByIdAsync(id);
+                var model = await _{modelVariable}Repository.GetByIdAsync(id);
                 if (model == null)
                 {{
                     return NotFound();
                 }}
- 
-                await _{modelName.ToLower()}Repository.DeleteAsync(id);
-                return RedirectToAction(nameof(Details));
+
+                await _{modelVariable}Repository.DeleteAsync(id);
+                return RedirectToAction(nameof(Index));
             }}
             catch (Exception ex)
             {{
-                // Log the exception details (optional)
                 return StatusCode(500, $""Internal server error: {{ex.Message}}"");
             }}
         }}
-            }}
-        }}
-        ";
 
+        {dropdownMethods}
+    }}
+}}";
         }
 
+        private string GenerateDropdownMethods(string modelName, string namespaceName)
+        {
+            var dropdownProperties = headers
+                .Where(h => h.ModelName == modelName && h.ControlType.ToLower() == "dropdown")
+                .ToList();
 
+            if (!dropdownProperties.Any())
+            {
+                return string.Empty;
+            }
+
+            var methods = new List<string>();
+
+            foreach (var property in dropdownProperties)
+            {
+                string method = "";
+                var DDLProperties = headers
+                .Where(h => h.PropertyName == property.PropertyName && h.IsPrimaryKey == true)
+                .Select(h => h.PropertyName)
+                .ToList();
+                string propertyName = property.PropertyName;
+                string relatedModel = property.DataType; // Assuming the DataType holds the related model name
+                if (DDLProperties.Count > 2)
+                {
+                    method = $@"
+        private async Task Bind{propertyName}Dropdown()
+        {{
+            var {relatedModel.ToLower()}List = await _{modelName}Repository.GetAllAsync(); // Assuming _context is the DbContext
+            ViewBag.{propertyName} = new SelectList({relatedModel.ToLower()}List, ""{DDLProperties[0]}"", ""{DDLProperties[2]}""); // Assuming Id and Name are the key and display field
+        }}";
+                }
+                else
+                {
+                    method = $@"
+        private async Task Bind{propertyName}Dropdown()
+        {{
+            var {relatedModel.ToLower()}List = await _{modelName}Repository.GetAllAsync(); // Assuming _context is the DbContext
+            ViewBag.{propertyName} = new SelectList({relatedModel.ToLower()}List, ""{DDLProperties[0]}"", ""{DDLProperties[1]}""); // Assuming Id and Name are the key and display field
+        }}";
+                }
+
+                methods.Add(method);
+            }
+
+            return string.Join(Environment.NewLine, methods);
+        }
 
         private async Task GenerateViews(string projectDirectory, string namespaceName, string modelName, List<string> properties)
         {
@@ -1130,7 +1181,7 @@ namespace {namespaceName}.Controllers
                     break;
                 case "dropdown":
                     // Assumes that there is a corresponding ViewData or SelectList for the property
-                    inputField = $@"<select asp-for=""{property.PropertyName}"" class=""form-select"" asp-items=""ViewBag.{property.PropertyName}Items"">
+                    inputField = $@"<select asp-for=""{property.PropertyName}"" class=""form-select"" asp-items=""ViewBag.{property.PropertyName}"">
                        <option value=""0"">--Select--</option>
                    </select>";
                     break;
