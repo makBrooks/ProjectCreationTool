@@ -1,4 +1,3 @@
-
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
@@ -327,8 +326,7 @@ namespace ProjectCreator.Controllers
 
 
 
-        List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey)> headers = new List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey)>();
-
+        List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey, string ControlType, string Annotation, string Max, string Min, string ErrorMessage, string RegularExpression, bool IsRequired)> headers = new List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey, string ControlType, string Annotation, string Max, string Min, string ErrorMessage, string RegularExpression, bool IsRequired)>();
 
         public async Task AddPropertiesFromExcel(IFormFile excelFile, string modelsPath, CreatorEntity input)
         {
@@ -337,46 +335,46 @@ namespace ProjectCreator.Controllers
                 using var stream = new MemoryStream();
                 await excelFile.CopyToAsync(stream);
                 stream.Position = 0;
-                var IsPrimaryKey = false;
-                //var headers = new List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey)>();
 
                 using var package = new ExcelPackage(stream);
                 var worksheet = package.Workbook.Worksheets.FirstOrDefault();
 
                 if (worksheet != null)
                 {
+                    
                     for (var row = 2; row <= worksheet.Dimension.End.Row; row++)
                     {
                         var modelName = worksheet.Cells[row, 1].Text.Trim();
                         var propertyName = worksheet.Cells[row, 2].Text.Trim();
                         var dataType = worksheet.Cells[row, 3].Text.Trim();
                         var primaryKey = worksheet.Cells[row, 4].Text.Trim();
-                        if (primaryKey.ToLower() == "primary key" || primaryKey.ToLower() == "primarykey" || primaryKey.ToLower() == "primary")
-                        {
-                            IsPrimaryKey = true;
-                        }
+                        var controlType = worksheet.Cells[row, 5].Text.Trim();
+                        var required = worksheet.Cells[row, 6].Text.Trim();
+                        var annotation = worksheet.Cells[row, 7].Text.Trim();
+                        var max = worksheet.Cells[row, 8].Text.Trim();
+                        var min = worksheet.Cells[row, 9].Text.Trim();
+                        var errorMessage = worksheet.Cells[row, 10].Text.Trim();
+                        var regularExpression = worksheet.Cells[row, 11].Text.Trim();
+
+                        var isPrimaryKey = primaryKey.ToLower() == "primary key" || primaryKey.ToLower() == "primarykey" || primaryKey.ToLower() == "primary";
+                        var isRequired = !string.IsNullOrWhiteSpace(required) && required == "TRUE";
+
                         if (input.ModelNames.Contains(modelName) && !string.IsNullOrWhiteSpace(propertyName) && !string.IsNullOrWhiteSpace(dataType))
                         {
-                            headers.Add((modelName, propertyName, GetCSharpType(dataType), IsPrimaryKey));
+                            headers.Add((modelName, propertyName, GetCSharpType(dataType), isPrimaryKey, controlType, annotation, max, min, errorMessage, regularExpression, isRequired));
                         }
-                        IsPrimaryKey = false;
                     }
-                }
 
-                foreach (var modelName in input.ModelNames)
-                {
-                    var modelHeaders = headers
-                        .Where(h => h.ModelName == modelName)
-                        .Select(h => (h.PropertyName, h.DataType, h.IsPrimaryKey))
-                        .ToList();
-
-                    if (modelHeaders.Count == 0)
+                    foreach (var modelName in input.ModelNames)
                     {
-                        //modelHeaders.Add(("PlaceholderProperty", "string", false));
-                    }
+                        var modelHeaders = headers
+                            .Where(h => h.ModelName == modelName)
+                            .Select(h => (h.PropertyName, h.DataType, h.IsPrimaryKey, h.ControlType, h.Annotation, h.Max, h.Min, h.ErrorMessage, h.RegularExpression, h.IsRequired))
+                            .ToList();
 
-                    var modelFilePath = Path.Combine(modelsPath, $"{modelName}.cs");
-                    await System.IO.File.WriteAllTextAsync(modelFilePath, GenerateModelClass(input.ProjectName, modelName, modelHeaders));
+                        var modelFilePath = Path.Combine(modelsPath, $"{modelName}.cs");
+                        await System.IO.File.WriteAllTextAsync(modelFilePath, GenerateModelClass(input.ProjectName, modelName, modelHeaders));
+                    }
                 }
             }
             catch (Exception ex)
@@ -385,28 +383,44 @@ namespace ProjectCreator.Controllers
             }
         }
 
-        private string GenerateModelClass(string projectName, string modelName, List<(string PropertyName, string DataType, bool IsPrimaryKey)> headers)
+        private string GenerateModelClass(string projectName, string modelName, List<(string PropertyName, string DataType, bool IsPrimaryKey, string ControlType, string Annotation, string Max, string Min, string ErrorMessage, string RegularExpression, bool IsRequired)> headers)
         {
             var classCode = $"// Generated class for {modelName}\n";
-            classCode = $"using System.ComponentModel.DataAnnotations;\r\nusing System.ComponentModel.DataAnnotations.Schema;\n";
+            classCode += "using System.ComponentModel.DataAnnotations;\r\nusing System.ComponentModel.DataAnnotations.Schema;\n";
             classCode += $"namespace {projectName}.Models\n{{\n";
             classCode += $"    public class {modelName}\n    {{\n";
 
-            foreach (var (propertyName, dataType, isPrimaryKey) in headers)
+            foreach (var (propertyName, dataType, isPrimaryKey, controlType, annotation, max, min, errorMessage, regularExpression, isRequired) in headers)
             {
                 if (isPrimaryKey)
                 {
                     classCode += "        [Key]\n";
                 }
-                if (dataType == "int")
+                if (isRequired)
                 {
-                    classCode += $"        public {dataType} {propertyName} {{ get; set; }} = 0;\n";
+                    classCode += "        [Required]\n";
                 }
-                else
+                //if (!string.IsNullOrWhiteSpace(annotation))
+                //{
+                //    classCode += $"        [{annotation}]\n";
+                //}
+                if (!string.IsNullOrWhiteSpace(max) && !string.IsNullOrWhiteSpace(min) && dataType.Equals("string", StringComparison.OrdinalIgnoreCase))
                 {
-                    classCode += $"        public {dataType} {propertyName} {{ get; set; }} = null;\n";
+                    classCode += $"        [StringLength({max}, MinimumLength = {min}, ErrorMessage = \"The field {propertyName} must be a string with a minimum length of {min} and a maximum length of {max}.\")]\n";
                 }
-
+                else if (!string.IsNullOrWhiteSpace(max) && dataType.Equals("string", StringComparison.OrdinalIgnoreCase))
+                {
+                    classCode += $"        [StringLength({max}, ErrorMessage = \"The field {propertyName} must be a string with a maximum length of {max}.\")]\n";
+                }
+                if (!string.IsNullOrWhiteSpace(min) && !string.IsNullOrWhiteSpace(max) && !dataType.Equals("string", StringComparison.OrdinalIgnoreCase))
+                {
+                    classCode += $"        [Range({min}, {max}, ErrorMessage = \"{errorMessage}\")]\n";
+                }
+                if (!string.IsNullOrWhiteSpace(regularExpression))
+                {
+                    classCode += $"        [RegularExpression(\"{regularExpression}\", ErrorMessage = \"{errorMessage}\")]\n";
+                }
+                classCode += $"        public {dataType} {propertyName} {{ get; set; }}\n";
             }
 
             classCode += "    }\n}";
@@ -993,8 +1007,8 @@ namespace {namespaceName}.Controllers
 
                 // Generate combined views
                 string addEditViewContent = GenerateAddViewTemplate(namespaceName, modelName, headers);
-                string viewDeleteViewContent = GenerateViewDeleteViewTemplate(namespaceName, modelName, properties);
-                string viewEditViewFileContent = GenerateEditViewTemplate(namespaceName, modelName, properties);
+                string viewDeleteViewContent = GenerateViewDeleteViewTemplate(namespaceName, modelName, headers);
+                string viewEditViewFileContent = GenerateEditViewTemplate(namespaceName, modelName, headers);
 
                 string addEditViewFilePath = Path.Combine(controllerFolder, "Create.cshtml");
                 string viewDeleteViewFilePath = Path.Combine(controllerFolder, "Details.cshtml");
@@ -1031,13 +1045,13 @@ namespace {namespaceName}.Controllers
             </div>
             ";
         }
-        private string GenerateAddViewTemplate(string namespaceName, string modelName, List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey)> headers)
+
+        private string GenerateAddViewTemplate(string namespaceName, string modelName, List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey, string ControlType, string Annotation, string Max, string Min, string ErrorMessage, string RegularExpression, bool IsRequired)> headers)
         {
             // Filter headers to exclude primary key properties
             var properties = headers
-    .Where(h => !h.IsPrimaryKey && h.ModelName == modelName)
-    .Select(h => h.PropertyName)
-    .ToList();
+                .Where(h => !h.IsPrimaryKey && h.ModelName == modelName)
+                .ToList();
 
             // Split properties into groups of 3
             var groupedProperties = properties.Select((p, i) => new { Property = p, Index = i })
@@ -1050,11 +1064,11 @@ namespace {namespaceName}.Controllers
             {
                 string fields = string.Join("\n", group.Select(p => $@"
 <div class=""col-md-4"">
-<div class=""form-group"">
-<label asp-for=""{p}"" class=""control-label""></label>
-<input asp-for=""{p}"" class=""form-control"" />
-<span asp-validation-for=""{p}"" class=""text-danger""></span>
-</div>
+    <div class=""form-group"">
+        <label asp-for=""{p.PropertyName}"" class=""control-label""></label>
+        {GenerateInputField(p)}
+        <span asp-validation-for=""{p.PropertyName}"" class=""text-danger""></span>
+    </div>
 </div>"));
                 return $@"<div class=""row"">
     {fields}
@@ -1063,49 +1077,97 @@ namespace {namespaceName}.Controllers
 
             return $@"
 @model {namespaceName}.Models.{modelName}
- 
+
 @{{
     ViewData[""Title""] = ""Add {modelName}"";
 }}
- 
+
 <h1>@ViewData[""Title""]</h1>
 {GenerateNavBar("Add", modelName)} <!-- Include the navigation bar here with 'Add' tab as active -->
 <div class=""container mt-5""> <!-- Added mt-5 for margin top -->
-<div class=""tab-content"" id=""nav-tabContent"">
-<div class=""tab-pane fade show active"" id=""nav-add"" role=""tabpanel"" aria-labelledby=""nav-add-tab"">
-<div class=""card"">
-<div class=""card-body"">
-<form asp-action=""Create"">
-<div asp-validation-summary=""ModelOnly"" class=""text-danger""></div>
+    <div class=""tab-content"" id=""nav-tabContent"">
+        <div class=""tab-pane fade show active"" id=""nav-add"" role=""tabpanel"" aria-labelledby=""nav-add-tab"">
+            <div class=""card"">
+                <div class=""card-body"">
+                    <form asp-action=""Create"">
+                        <div asp-validation-summary=""ModelOnly"" class=""text-danger""></div>
                         {formFields}
-<div class=""form-group text-center mt-5"">
-<input type=""submit"" value=""Add"" class=""btn btn-primary"" />
-<input type=""reset"" value=""Reset"" class=""btn btn-secondary ml-2"" />
+                        <div class=""form-group text-center mt-5"">
+                            <input type=""submit"" value=""Add"" class=""btn btn-primary"" />
+                            <input type=""reset"" value=""Reset"" class=""btn btn-secondary ml-2"" />
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-</form>
-</div>
-</div>
-</div>
-</div>
-</div>
- 
+
 <!-- Bootstrap JS and dependencies -->
 <script src=""https://code.jquery.com/jquery-3.5.1.slim.min.js""></script>
 <script src=""https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js""></script>
 ";
         }
-        private string GenerateViewDeleteViewTemplate(string namespaceName, string modelName, List<string> properties)
+
+        private string GenerateInputField((string ModelName, string PropertyName, string DataType, bool IsPrimaryKey, string ControlType, string Annotation, string Max, string Min, string ErrorMessage, string RegularExpression, bool IsRequired) property)
         {
-            // Find the first string that contains "id"
-            string firstPropertyWithId = properties.FirstOrDefault(property => property.Contains("id", StringComparison.OrdinalIgnoreCase));
+            string inputField = string.Empty;
+            switch (property.ControlType.ToLower())
+            {
+                case "textbox":
+                    inputField = $@"<input asp-for=""{property.PropertyName}"" class=""form-control"" />";
+                    break;
+                case "textarea":
+                    inputField = $@"<textarea asp-for=""{property.PropertyName}"" class=""form-control""></textarea>";
+                    break;
+                case "dropdown":
+                    // Assumes that there is a corresponding ViewData or SelectList for the property
+                    inputField = $@"<select asp-for=""{property.PropertyName}"" class=""form-select"" asp-items=""ViewBag.{property.PropertyName}Items"">
+                       <option value=""0"">--Select--</option>
+                   </select>";
+                    break;
+                case "checkbox":
+                    inputField = $@"<input type=""checkbox"" asp-for=""{property.PropertyName}"" class=""form-check-input"" />";
+                    break;
+                case "radiobutton":
+                    // Assumes that there is a corresponding ViewData or IEnumerable for the property
+                    inputField = $@"@foreach (var item in ViewBag.{property.PropertyName}Items)
+                    {{
+                        <div class=""form-check"">
+                            <input type=""radio"" asp-for=""{property.PropertyName}"" class=""form-check-input"" value=""@item.Value"" />
+                            <label class=""form-check-label"">@item.Text</label>
+                        </div>
+                    }}";
+                    break;
+                case "date":
+                    inputField = $@"<input type=""date"" asp-for=""{property.PropertyName}"" class=""form-control"" />";
+                    break;
+                case "fileupload":
+                    inputField = $@"<input type=""file"" asp-for=""{property.PropertyName}"" class=""form-control"" />";
+                    break;
+                default:
+                    inputField = $@"<input asp-for=""{property.PropertyName}"" class=""form-control"" />";
+                    break;
+            }
+            return inputField;
+        }
+
+        private string GenerateViewDeleteViewTemplate(string namespaceName, string modelName, List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey, string ControlType, string Annotation, string Max, string Min, string ErrorMessage, string RegularExpression, bool IsRequired)> headers)
+        {
+            // Get properties specific to the model
+            var modelHeaders = headers.Where(h => h.ModelName == modelName).ToList();
+
+            // Find the first property that is a primary key or contains "id"
+            string firstPropertyWithId = modelHeaders
+                .FirstOrDefault(h => h.IsPrimaryKey || h.PropertyName.Contains("id", StringComparison.OrdinalIgnoreCase)).PropertyName;
 
             // Generating table headers
-            string tableHeaders = string.Join("\n", properties.Select(p => $@"
-        <th>@Html.DisplayNameFor(model => model.{p})</th>"));
+            string tableHeaders = string.Join("\n", modelHeaders.Select(h => $@"
+        <th>@Html.DisplayNameFor(model => model.{h.PropertyName})</th>"));
 
             // Generating table rows
-            string tableRows = string.Join("\n", properties.Select(p => $@"
-        <td>@Html.DisplayFor(modelItem => item.{p})</td>"));
+            string tableRows = string.Join("\n", modelHeaders.Select(h => $@"
+        <td>@Html.DisplayFor(modelItem => item.{h.PropertyName})</td>"));
 
             return $@"
 @model IEnumerable<{namespaceName}.Models.{modelName}>
@@ -1116,7 +1178,7 @@ namespace {namespaceName}.Controllers
 <link href=""https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"" rel=""stylesheet"" />
 <link href=""https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"" rel=""stylesheet"" />
 <h1>@ViewData[""Title""]</h1>
-{GenerateNavBar("View", modelName)} <!-- Include the navigation bar here with 'Add' tab as active -->
+{GenerateNavBar("View", modelName)} <!-- Include the navigation bar here with 'View' tab as active -->
 <table class=""table table-bordered"">
     <thead>
         <tr>
@@ -1133,7 +1195,7 @@ namespace {namespaceName}.Controllers
                     @using (Html.BeginForm(""Delete"", ""{modelName}"", new {{ id = item.{firstPropertyWithId} }}, FormMethod.Post))
                     {{
                         @Html.AntiForgeryToken();
-                    <a class=""btn btn-info"" asp-action=""Edit"" asp-route-id=""@item.{firstPropertyWithId}""><i class=""fas fa-edit""></i></a>
+                        <a class=""btn btn-info"" asp-action=""Edit"" asp-route-id=""@item.{firstPropertyWithId}""><i class=""fas fa-edit""></i></a>
                         <button type=""submit"" class=""btn btn-danger"">
                             <i class=""fas fa-trash-alt""></i>
                         </button>
@@ -1146,13 +1208,11 @@ namespace {namespaceName}.Controllers
 <!-- Bootstrap JS and dependencies -->
 <script src=""https://code.jquery.com/jquery-3.5.1.slim.min.js""></script>
 <script src=""https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js""></script>
-<script src=""https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.jss""></script>
+<script src=""https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js""></script>
 ";
         }
 
-
-
-        private string GenerateEditViewTemplate(string namespaceName, string modelName, List<string> prop)
+        private string GenerateEditViewTemplate(string namespaceName, string modelName, List<(string ModelName, string PropertyName, string DataType, bool IsPrimaryKey, string ControlType, string Annotation, string Max, string Min, string ErrorMessage, string RegularExpression, bool IsRequired)> headers)
         {
             var primaryKeyField = headers
                 .Where(h => h.IsPrimaryKey && h.ModelName == modelName)
@@ -1161,7 +1221,6 @@ namespace {namespaceName}.Controllers
 
             var properties = headers
                 .Where(h => !h.IsPrimaryKey && h.ModelName == modelName)
-                .Select(h => h.PropertyName)
                 .ToList();
 
             // Split properties into groups of 3
@@ -1192,9 +1251,9 @@ namespace {namespaceName}.Controllers
                 string fields = string.Join("\n", group.Select(p => $@"
 <div class=""col-md-4"">
     <div class=""form-group"">
-        <label asp-for=""{p}"" class=""control-label""></label>
-        <input asp-for=""{p}"" class=""form-control"" />
-        <span asp-validation-for=""{p}"" class=""text-danger""></span>
+        <label asp-for=""{p.PropertyName}"" class=""control-label""></label>
+        {GenerateInputFieldEdit(p)}
+        <span asp-validation-for=""{p.PropertyName}"" class=""text-danger""></span>
     </div>
 </div>"));
                 return $@"<div class=""row"">
@@ -1231,6 +1290,48 @@ namespace {namespaceName}.Controllers
 }}";
         }
 
+        private string GenerateInputFieldEdit((string ModelName, string PropertyName, string DataType, bool IsPrimaryKey, string ControlType, string Annotation, string Max, string Min, string ErrorMessage, string RegularExpression, bool IsRequired) property)
+        {
+            string inputField = string.Empty;
+            switch (property.ControlType.ToLower())
+            {
+                case "textbox":
+                    inputField = $@"<input asp-for=""{property.PropertyName}"" class=""form-control"" />";
+                    break;
+                case "textarea":
+                    inputField = $@"<textarea asp-for=""{property.PropertyName}"" class=""form-control""></textarea>";
+                    break;
+                case "dropdown":
+                    // Assumes that there is a corresponding ViewData or SelectList for the property
+                    inputField = $@"<select asp-for=""{property.PropertyName}"" class=""form-select"" asp-items=""ViewBag.{property.PropertyName}Items""></select>";
+                    break;
+                case "checkbox":
+                    inputField = $@"<input type=""checkbox"" asp-for=""{property.PropertyName}"" class=""form-check-input"" />";
+                    break;
+                case "radiobutton":
+                    // Assumes that there is a corresponding ViewData or IEnumerable for the property
+                    inputField = $@"@foreach (var item in ViewBag.{property.PropertyName}Items)
+                    {{
+                        <div class=""form-check"">
+                            <input type=""radio"" asp-for=""{property.PropertyName}"" class=""form-check-input"" value=""@item.Value"" />
+                            <label class=""form-check-label"">@item.Text</label>
+                        </div>
+                    }}";
+                    break;
+                case "date":
+                    inputField = $@"<input type=""date"" asp-for=""{property.PropertyName}"" class=""form-control"" />";
+                    break;
+                case "fileupload":
+                    inputField = $@"<input type=""file"" asp-for=""{property.PropertyName}"" class=""form-control"" />";
+                    break;
+                default:
+                    inputField = $@"<input asp-for=""{property.PropertyName}"" class=""form-control"" />";
+                    break;
+            }
+            return inputField;
+        }
+
+
 
 
 
@@ -1238,7 +1339,6 @@ namespace {namespaceName}.Controllers
         {
             return View();
         }
-
 
         public IActionResult Index()
         {
