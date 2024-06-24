@@ -147,8 +147,8 @@ namespace ProjectCreator.Controllers
                 ExecuteDotnetCommand($"dotnet publish \"{Path.Combine(projectDirectory, $"{input.ProjectName}.csproj")}\" -c Release -o \"{publishDir}\"");
 
                 // Copy published files to desktop
-                string desktopPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), $"publish_{input.ProjectName}");
-                DirectoryCopy(publishDir, desktopPath, true);
+                //string desktopPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), $"publish_{input.ProjectName}");
+                //DirectoryCopy(publishDir, desktopPath, true);
 
                 // Set up IIS
                 string siteName = input.ProjectName;
@@ -159,7 +159,7 @@ namespace ProjectCreator.Controllers
 
                 CreateIISApplication(siteName, appPoolName, publishDir, ipAddress, port);
 
-                string url = $"http://{ipAddress}";
+                string url = $"http://{ipAddress}:{port}";
 
                 return Ok(new { message = "Project created and published successfully", url = url });
             }
@@ -445,29 +445,34 @@ namespace ProjectCreator.Controllers
         // Method to execute command
         private void ExecuteDotnetCommand(string command)
         {
-            try
+            using (var process = new System.Diagnostics.Process())
             {
-                var processInfo = new ProcessStartInfo("dotnet", command)
-                {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                };
+                process.StartInfo.FileName = "dotnet";
+                process.StartInfo.Arguments = command;
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.RedirectStandardError = true;
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.CreateNoWindow = true;
 
-                using var process = new Process { StartInfo = processInfo };
+                var outputBuilder = new System.Text.StringBuilder();
+                var errorBuilder = new System.Text.StringBuilder();
+
+                process.OutputDataReceived += (sender, args) => outputBuilder.AppendLine(args.Data);
+                process.ErrorDataReceived += (sender, args) => errorBuilder.AppendLine(args.Data);
+
                 process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
                 process.WaitForExit();
+
+                string output = outputBuilder.ToString();
+                string error = errorBuilder.ToString();
 
                 if (process.ExitCode != 0)
                 {
-                    var error = process.StandardError.ReadToEnd();
-                    throw new Exception($"Command '{command}' failed: {error}");
+                    throw new Exception($"Command '{command}' failed with error: {error}, Output: {output}");
                 }
-            }
-            catch (Exception ex)
-            {
-                throw ex;
             }
         }
         // Method to convert Property Datatype
