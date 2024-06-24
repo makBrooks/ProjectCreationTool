@@ -141,6 +141,8 @@ namespace ProjectCreator.Controllers
                 await RunMigrationCommandAndOpenSolution(projectDirectory, "InitialMigration", solutionPath);
 
 
+               
+
                 // Publish the project
                 ExecuteDotnetCommand($"dotnet publish \"{Path.Combine(projectDirectory, $"{input.ProjectName}.csproj")}\" -c Release -o \"{publishDir}\"");
 
@@ -370,7 +372,7 @@ namespace ProjectCreator.Controllers
                         var regularExpression = worksheet.Cells[row, 11].Text.Trim();
 
                         var isPrimaryKey = primaryKey.ToLower() == "primary key" || primaryKey.ToLower() == "primarykey" || primaryKey.ToLower() == "primary";
-                        var isRequired = !string.IsNullOrWhiteSpace(required) && required == "TRUE";
+                        var isRequired = !string.IsNullOrWhiteSpace(required) && required.ToLower() == "true";
 
                         if (input.ModelNames.Contains(modelName) && !string.IsNullOrWhiteSpace(propertyName) && !string.IsNullOrWhiteSpace(dataType))
                         {
@@ -848,9 +850,36 @@ namespace {input.ProjectName}.Container
 
         private string GenerateControllerTemplate(string namespaceName, string modelName)
         {
+            string bindDropdown = "";
+            string bindDropdownedit = "";
+            string dInjection = "";
+            string dimethod = "";
+            string diValue = "";
             string modelVariable = modelName.ToLower();
-
-            string dropdownMethods = GenerateDropdownMethods(modelName, namespaceName);
+            var dropdownProperties = headers
+    .Where(h => h.ModelName == modelName && h.ControlType.ToLower() == "dropdown")
+    .Select(h => h.PropertyName)
+    .ToList();
+            if (dropdownProperties.Any())
+            {
+                foreach (var item in dropdownProperties)
+                {
+                    var searchmodelNames = headers
+            .Where(h => h.PropertyName == item.ToString() && h.IsPrimaryKey)
+            .Select(h => h.ModelName)
+            .ToList();
+                    foreach (var model in searchmodelNames)
+                    {
+                        dInjection = dInjection + $"private readonly I{model}Repository _{model.ToString().ToLower()}Repository;\r\n        ";
+                        dimethod = dimethod + $",I{model}Repository {model.ToString().ToLower()}Repository";
+                        diValue = diValue + $"_{model.ToString().ToLower()}Repository = {model.ToString().ToLower()}Repository;\r\n        ";
+                        bindDropdownedit = bindDropdownedit + $"Bind{item}Dropdown(model.{item});\n";
+                    }
+                    bindDropdown = bindDropdown + $"Bind{item}Dropdown(0);\n";
+                }
+                
+            }
+            string dropdownMethods = GenerateDropdownMethods(modelName, modelVariable);
 
             return $@"
 using Microsoft.AspNetCore.Mvc;
@@ -868,14 +897,16 @@ namespace {namespaceName}.Controllers
     public class {modelName}Controller : Controller
     {{
         private readonly I{modelName}Repository _{modelVariable}Repository;
+        {dInjection}
 
-        public {modelName}Controller(I{modelName}Repository {modelVariable}Repository)
+        public {modelName}Controller(I{modelName}Repository {modelVariable}Repository {dimethod})
         {{
             _{modelVariable}Repository = {modelVariable}Repository;
+            {diValue}
         }}
 
         // GET: {modelName}
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Details()
         {{
             try
             {{
@@ -888,7 +919,8 @@ namespace {namespaceName}.Controllers
             }}
         }}
 
-        // GET: {modelName}/Details/5
+        // POST: {modelName}/Details/5
+        [HttpPost]
         public async Task<IActionResult> Details(int? id)
         {{
             if (id == null)
@@ -915,7 +947,15 @@ namespace {namespaceName}.Controllers
         // GET: {modelName}/Create
         public IActionResult Create()
         {{
-            return View();
+            try
+                {{
+                    {bindDropdown}
+                    return View();
+                }}
+                catch (Exception ex)
+                {{
+                    return StatusCode(500, $""Internal server error: {{ex.Message}}"");
+                }}
         }}
 
         // POST: {modelName}/Create
@@ -928,7 +968,7 @@ namespace {namespaceName}.Controllers
                 try
                 {{
                     await _{modelVariable}Repository.AddAsync(model);
-                    return RedirectToAction(nameof(Index));
+                    return RedirectToAction(nameof(Details));
                 }}
                 catch (Exception ex)
                 {{
@@ -949,6 +989,7 @@ namespace {namespaceName}.Controllers
             try
             {{
                 var model = await _{modelVariable}Repository.GetByIdAsync(id.Value);
+                {bindDropdownedit}
                 if (model == null)
                 {{
                     return NotFound();
@@ -971,7 +1012,7 @@ namespace {namespaceName}.Controllers
                 try
                 {{
                     await _{modelVariable}Repository.UpdateAsync(model);
-                    return RedirectToAction(nameof(Index));
+                    return RedirectToAction(nameof(Details));
                 }}
                 catch (Exception ex)
                 {{
@@ -995,7 +1036,7 @@ namespace {namespaceName}.Controllers
                 }}
 
                 await _{modelVariable}Repository.DeleteAsync(id);
-                return RedirectToAction(nameof(Index));
+                return RedirectToAction(nameof(Details));
             }}
             catch (Exception ex)
             {{
@@ -1008,12 +1049,12 @@ namespace {namespaceName}.Controllers
 }}";
         }
 
-        private string GenerateDropdownMethods(string modelName, string namespaceName)
+        private string GenerateDropdownMethods(string modelName, string modelVariable)
         {
             var dropdownProperties = headers
                 .Where(h => h.ModelName == modelName && h.ControlType.ToLower() == "dropdown")
-                .ToList();
-
+                .Select(h => h.PropertyName)
+                .ToList();            
             if (!dropdownProperties.Any())
             {
                 return string.Empty;
@@ -1023,35 +1064,30 @@ namespace {namespaceName}.Controllers
 
             foreach (var property in dropdownProperties)
             {
+                var searchmodelName = headers
+            .Where(h => h.PropertyName == property.ToString() && h.IsPrimaryKey)
+            .Select(h => h.ModelName)
+            .FirstOrDefault();
                 string method = "";
-                var DDLProperties = headers
-                .Where(h => h.PropertyName == property.PropertyName && h.IsPrimaryKey == true)
-                .Select(h => h.PropertyName)
-                .ToList();
-                string propertyName = property.PropertyName;
-                string relatedModel = property.DataType; // Assuming the DataType holds the related model name
-                if (DDLProperties.Count > 2)
+                if (searchmodelName != null)
                 {
-                    method = $@"
-        private async Task Bind{propertyName}Dropdown()
-        {{
-            var {relatedModel.ToLower()}List = await _{modelName}Repository.GetAllAsync(); // Assuming _context is the DbContext
-            ViewBag.{propertyName} = new SelectList({relatedModel.ToLower()}List, ""{DDLProperties[0]}"", ""{DDLProperties[2]}""); // Assuming Id and Name are the key and display field
-        }}";
-                }
-                else
-                {
-                    method = $@"
-        private async Task Bind{propertyName}Dropdown()
-        {{
-            var {relatedModel.ToLower()}List = await _{modelName}Repository.GetAllAsync(); // Assuming _context is the DbContext
-            ViewBag.{propertyName} = new SelectList({relatedModel.ToLower()}List, ""{DDLProperties[0]}"", ""{DDLProperties[1]}""); // Assuming Id and Name are the key and display field
-        }}";
-                }
+                    // Get all properties from the found model name
+                    var properties = headers
+                        .Where(h => h.ModelName == searchmodelName)
+                        .ToList();
 
+                    
+                    method = $@"
+        private async Task Bind{property}Dropdown(int? id)
+        {{
+            var {property.ToLower()}List = await _{searchmodelName.ToLower()}Repository.GetAllAsync();
+            // Add the default item
+            {property.ToLower()}List.Insert(0, new {searchmodelName} {{{properties[0].PropertyName} = 0, {properties[1].PropertyName}   = ""--select--""}});
+            ViewBag.{property} = new SelectList({property.ToLower()}List, ""{properties[0].PropertyName}"", ""{properties[1].PropertyName}"", id.HasValue && id != 0 ? id : 0);
+        }}";
+                }
                 methods.Add(method);
             }
-
             return string.Join(Environment.NewLine, methods);
         }
 
@@ -1182,7 +1218,6 @@ namespace {namespaceName}.Controllers
                 case "dropdown":
                     // Assumes that there is a corresponding ViewData or SelectList for the property
                     inputField = $@"<select asp-for=""{property.PropertyName}"" class=""form-select"" asp-items=""ViewBag.{property.PropertyName}"">
-                       <option value=""0"">--Select--</option>
                    </select>";
                     break;
                 case "checkbox":
@@ -1362,7 +1397,7 @@ namespace {namespaceName}.Controllers
                     break;
                 case "dropdown":
                     // Assumes that there is a corresponding ViewData or SelectList for the property
-                    inputField = $@"<select asp-for=""{property.PropertyName}"" class=""form-select"" asp-items=""ViewBag.{property.PropertyName}Items""></select>";
+                    inputField = $@"<select asp-for=""{property.PropertyName}"" class=""form-select"" asp-items=""ViewBag.{property.PropertyName}""></select>";
                     break;
                 case "checkbox":
                     inputField = $@"<input type=""checkbox"" asp-for=""{property.PropertyName}"" class=""form-check-input"" />";
