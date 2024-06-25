@@ -950,7 +950,7 @@ namespace {namespaceName}.Controllers
         }}
 
         // GET: {modelName}/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {{
             try
                 {{
