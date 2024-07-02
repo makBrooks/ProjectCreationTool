@@ -880,7 +880,7 @@ namespace {input.ProjectName}.Container
                         diValue = diValue + $"_{model.ToString().ToLower()}Repository = {model.ToString().ToLower()}Repository;\r\n        ";
                         bindDropdownedit = bindDropdownedit + $"Bind{item}Dropdown(model.{item});\n";
                     }
-                    bindDropdown = bindDropdown + $"Bind{item}Dropdown(0);\n";
+                    bindDropdown = bindDropdown + $"await Bind{item}Dropdown(0);\n";
                 }
                 
             }
